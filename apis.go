@@ -4,15 +4,21 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/gabrielcortez835-lab/Novellia-take-home-assessment/apiFunctions"
+	"github.com/gabrielcortez835-lab/Novellia-take-home-assessment/constants"
+	"github.com/gabrielcortez835-lab/Novellia-take-home-assessment/extractionConfig"
+	"github.com/gabrielcortez835-lab/Novellia-take-home-assessment/sql"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	dbObj, err := NewDatabase(SqlDBName)
+	dbObj, err := sql.NewDatabase(constants.SqlDBName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,24 +34,16 @@ func setupAPIS() *gin.Engine {
 	// Create a Gin router with default middleware (logger and recovery)
 	r := gin.Default()
 
-	// Define a simple GET endpoint
-	r.GET("/ping", getPong)
-	r.POST("/import", postImport)
-	r.GET("/GetByID/:id", GetById)
+	r.POST(constants.ApiPostImportPath, apiPostImport)
+	r.GET(constants.ApiGetRecordsByIdPath, apiGetRecordsById)
+	r.GET(constants.ApiGetRecordsPath, apiGetRecords)
+	r.POST(constants.ApiPostTransformPath, apiPostTransform)
 
 	return r
 }
 
-// api tester
-func getPong(c *gin.Context) {
-	// Return JSON response
-	c.JSON(http.StatusOK, gin.H{
-		"message": "pong",
-	})
-}
-
 // adds items from JSONL received in the request body.
-func postImport(c *gin.Context) {
+func apiPostImport(c *gin.Context) {
 	scanner := bufio.NewScanner(c.Request.Body)
 	defer c.Request.Body.Close()
 
@@ -58,6 +56,14 @@ func postImport(c *gin.Context) {
 			RecordsByType:  make(map[string]int),
 			uniquePatients: 0,
 		},
+	}
+	cfg, err := extractionConfig.GetExtractionConfig(constants.ExtractionConfigFileName)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to load extraction Config",
+		})
+		return
 	}
 
 	for lineNum := 1; scanner.Scan(); lineNum++ {
@@ -82,14 +88,7 @@ func postImport(c *gin.Context) {
 				continue
 			}
 
-			var obj map[string]interface{}
-			if err := json.Unmarshal([]byte(objLine), &obj); err != nil {
-				log.Printf("Inner unmarshal failed (line %d obj %d): %v", lineNum, objNum+1, err)
-				importReturn.validationErrors = append(importReturn.validationErrors, fmt.Sprintf("Invalid inner JSON on line %d object %d: %v", lineNum, objNum+1, err))
-				continue
-			}
-
-			dataQualityWarnings, err := ProcessImportedJson(obj)
+			dataQualityWarnings, err := apiFunctions.ProcessImportedJson(objLine, cfg)
 
 			if err != nil {
 				importReturn.validationErrors = append(importReturn.validationErrors, fmt.Sprintf("Error Processing on line %d object %d: %v", lineNum, objNum+1, err))
@@ -115,18 +114,54 @@ func postImport(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "Import complete"})
 }
 
-func GetById(c *gin.Context) {
+func apiGetRecordsById(c *gin.Context) {
 	id := c.Param("id")
 
-	db, err := Connect(SqlDBName)
+	fields := c.Query("fields")
 
-	if err != nil {
+	var fieldsArr []string
 
+	if fields == "" {
+		fieldsArr = nil
+	} else {
+		fieldsArr = strings.Split(fields, ",")
 	}
 
-	defer db.Close()
+	metadata, err := apiFunctions.GetRecordsById(id, fieldsArr)
 
-	metadata, err := GetResourceById(db, id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Encountered an issue, please try again later",
+		})
+		return
+	}
+
+	if metadata == "" {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "No Entry Found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"results": metadata})
+}
+
+func apiGetRecords(c *gin.Context) {
+	fields := c.Query("fields")
+
+	var fieldsArr []string
+
+	if fields == "" {
+		fieldsArr = nil
+	} else {
+		fieldsArr = strings.Split(fields, ",")
+	}
+
+	resourceType := c.Query("resourceType")
+
+	subject := c.Query("subject")
+
+	metadata, err := apiFunctions.GetRecords(resourceType, subject, fieldsArr)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -143,4 +178,40 @@ func GetById(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"metadata": metadata})
+}
+
+func apiPostTransform(c *gin.Context) {
+	defer c.Request.Body.Close()
+
+	jsonBytes, err := io.ReadAll(c.Request.Body)
+	jsonString := string(jsonBytes)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	metadata, err := apiFunctions.TransformRequest(jsonString)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	if metadata == "" {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "No Entry Found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"metadata": metadata})
+}
+
+func apiGetAnalytics(c *gin.Context) {
+
 }
