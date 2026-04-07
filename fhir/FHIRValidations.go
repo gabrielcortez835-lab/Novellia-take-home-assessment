@@ -82,7 +82,6 @@ func validateProcedureGJSON(resource gjson.Result) []string {
 
 func validatePatientGJSON(resource gjson.Result) []string {
 	retArr := []string{}
-
 	retArr = append(retArr, validateFHIRBaseGJSON(resource)...)
 
 	return retArr

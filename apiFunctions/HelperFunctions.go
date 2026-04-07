@@ -36,3 +36,15 @@ func ResultsToJSONL(results []gjson.Result, fields []string) (string, error) {
 
 	return jsonlBuilder.String(), nil
 }
+
+func StructSliceToJSONStringSlice[T any](items []T) ([]string, error) {
+	out := make([]string, 0, len(items))
+	for _, v := range items {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, string(b))
+	}
+	return out, nil
+}

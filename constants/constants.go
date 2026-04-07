@@ -2,6 +2,7 @@ package constants
 
 const SqlDBName = "FHIRDataDB"
 const FHIRDataTableName = "FHIRData"
+const ValidationErrorTableName = "ValidationErrorTable"
 
 var ValidStatus = map[string]bool{
 	"active":    true,
@@ -17,13 +18,15 @@ var ValidResourceTypes = map[string]bool{
 	"Patient":           true,
 }
 
-const ApiPostImportPath = "/import"
-const ApiGetRecordsByIdPath = "/records/:id"
-const ApiGetRecordsPath = "/records"
-const ApiPostTransformPath = "/transform"
+const (
+	ApiPostImportPath     = "/import"
+	ApiGetRecordsByIdPath = "/records/:id"
+	ApiGetRecordsPath     = "/records"
+	ApiPostTransformPath  = "/transform"
+	ApiGetAnalytics       = "/analytics"
+)
 
-const ExtractionConfigFileName = "extactionConfig.json"
-
+const ExtractionConfigFileName = "extractionConfig/extractionConfig.json"
 
 var ResourceTypeEnum = struct {
 	Patient           string

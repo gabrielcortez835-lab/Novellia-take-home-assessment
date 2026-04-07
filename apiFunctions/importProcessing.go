@@ -39,7 +39,17 @@ func ProcessImportedJson(jsonString string, cfg extractionConfig.ExtractionConfi
 
 	warnings := fhir.ValidateResource(resourceType, extractedJson)
 
-	err := sql.SqlInsertResource(id, resourceType, patientID, jsonString)
+	if len(warnings) > 0 {
+		jsonBytes, err := json.Marshal(warnings)
+
+		if err != nil {
+			return nil, err
+		}
+
+		sql.InsertValidationError(id, string(jsonBytes))
+	}
+
+	err := sql.InsertResource(id, resourceType, patientID, jsonString)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +58,7 @@ func ProcessImportedJson(jsonString string, cfg extractionConfig.ExtractionConfi
 }
 
 func extractFieldsToGJSON(resource gjson.Result, cfg extractionConfig.ExtractionConfig) gjson.Result {
-	extracted := make(map[string]interface{})
+	extracted := make(map[string]any)
 	resourceType := resource.Get("resourceType").String()
 
 	for fieldPath, allowed := range cfg.Fields {
@@ -59,9 +69,10 @@ func extractFieldsToGJSON(resource gjson.Result, cfg extractionConfig.Extraction
 			if v == "all" {
 				shouldExtract = true
 			}
-		case []string:
+
+		case []interface{}:
 			for _, t := range v {
-				if t == resourceType {
+				if s, ok := t.(string); ok && s == resourceType {
 					shouldExtract = true
 					break
 				}

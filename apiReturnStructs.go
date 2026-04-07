@@ -1,14 +1,14 @@
 package main
 
 type ImportReturn struct {
-	totalLinesProcessed         int
-	recordsImportedSuccessfully int
-	validationErrors            []string
-	dataQualityWarnings         map[string][]string
-	statistics                  Statistics
+	TotalLinesProcessed         int                 `json:"totalLinesProcessed"`
+	RecordsImportedSuccessfully int                 `json:"recordsImportedSuccessfully"`
+	ValidationErrors            []string            `json:"validationErrors"`
+	DataQualityWarnings         map[string][]string `json:"dataQualityWarnings"`
+	Statistics                  Statistics          `json:"statistics"`
 }
 
 type Statistics struct {
-	RecordsByType  map[string]int
-	uniquePatients int
+	RecordsByType  map[string]int `json:"recordsByType"`
+	UniquePatients int            `json:"uniquePatients"`
 }

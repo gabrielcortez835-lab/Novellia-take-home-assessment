@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/gabrielcortez835-lab/Novellia-take-home-assessment/constants"
+	"github.com/gabrielcortez835-lab/Novellia-take-home-assessment/objects"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/tidwall/gjson"
 )
@@ -46,8 +47,8 @@ func NewDatabase(filePath string) (*Database, error) {
 	return dbObj, nil
 }
 
-// SqlConnect opens (and creates if not exists) a SQLite DB file
-func SqlConnect(filePath string) (*sql.DB, error) {
+// Connect opens (and creates if not exists) a SQLite DB file
+func Connect(filePath string) (*sql.DB, error) {
 	// Check if file exists
 	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
@@ -72,25 +73,40 @@ func SqlConnect(filePath string) (*sql.DB, error) {
 func (d *Database) initializeSchema() error {
 	// Example: create a table
 	schema := fmt.Sprintf(`
-    CREATE TABLE IF NOT EXISTS %s (
-        id TEXT NOT NULL PRIMARY KEY,
-        resourceType TEXT NOT NULL,
-        subject TEXT NOT NULL,
-        metadata TEXT
-    );
-`, constants.FHIRDataTableName)
+		CREATE TABLE IF NOT EXISTS %s (
+			id TEXT NOT NULL PRIMARY KEY,
+			resourceType TEXT NOT NULL,
+			subject TEXT NOT NULL,
+			metadata TEXT
+		);
+		`, constants.FHIRDataTableName)
 	_, err := d.DB.Exec(schema)
+
+	if err != nil {
+		return err
+	}
+
+	schema = fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		entryId TEXT,
+		validationError TEXT
+		);
+		`, constants.ValidationErrorTableName)
+	_, err = d.DB.Exec(schema)
+
 	return err
+
 }
 
 func (d *Database) upgradeSchema() error {
 	return nil
 }
 
-// SqlInsertResource inserts a new record into resources table
-func SqlInsertResource(id, resourceType, subject, metadata string) error {
+// InsertResource inserts a new record into resources table
+func InsertResource(id, resourceType, subject, metadata string) error {
 
-	db, err := SqlConnect(constants.SqlDBName)
+	db, err := Connect(constants.SqlDBName)
 	if err != nil {
 		return err
 	}
@@ -115,8 +131,8 @@ func SqlInsertResource(id, resourceType, subject, metadata string) error {
 }
 
 // InsertResource inserts a new record into resources table
-func SqlGetRecordsById(id string) ([]gjson.Result, error) {
-	db, err := SqlConnect(constants.SqlDBName)
+func GetRecordsById(id string) ([]gjson.Result, error) {
+	db, err := Connect(constants.SqlDBName)
 
 	if err != nil {
 		return nil, err
@@ -130,11 +146,11 @@ func SqlGetRecordsById(id string) ([]gjson.Result, error) {
     WHERE id = ?;
     `, constants.FHIRDataTableName)
 
-	return sqlGetQueryInternal(db, query, id)
+	return GetQueryInternal(db, query, id)
 }
 
-func SqlGetRecords(resourceType string, subject string) ([]gjson.Result, error) {
-	db, err := SqlConnect(constants.SqlDBName)
+func GetRecords(resourceType string, subject string) ([]gjson.Result, error) {
+	db, err := Connect(constants.SqlDBName)
 
 	if err != nil {
 		return nil, err
@@ -142,57 +158,57 @@ func SqlGetRecords(resourceType string, subject string) ([]gjson.Result, error) 
 	defer db.Close()
 
 	if resourceType != "" && subject != "" {
-		return sqlGetRecordsByResourceTypeAndSubjectInternal(db, subject, subject)
+		return GetRecordsByResourceTypeAndSubjectInternal(db, resourceType, subject)
 	} else if resourceType != "" {
-		return sqlGetRecordsByResourceTypeInternal(db, subject)
+		return GetRecordsByResourceTypeInternal(db, resourceType)
 	} else if subject != "" {
-		return sqlGetRecordsBySubjectInternal(db, subject)
+		return GetRecordsBySubjectInternal(db, subject)
 	} else {
-		return sqlGetRecordsInternal(db)
+		return GetRecordsInternal(db)
 	}
 
 }
 
-func sqlGetRecordsInternal(db *sql.DB) ([]gjson.Result, error) {
+func GetRecordsInternal(db *sql.DB) ([]gjson.Result, error) {
 	query := fmt.Sprintf(`
         SELECT metadata
         FROM %s;
     `, constants.FHIRDataTableName)
 
-	return sqlGetQueryInternal(db, query)
+	return GetQueryInternal(db, query)
 }
 
-func sqlGetRecordsByResourceTypeInternal(db *sql.DB, resourceType string) ([]gjson.Result, error) {
+func GetRecordsByResourceTypeInternal(db *sql.DB, resourceType string) ([]gjson.Result, error) {
 	query := fmt.Sprintf(`
         SELECT metadata
         FROM %s
         WHERE resourceType = ?;
     `, constants.FHIRDataTableName)
 
-	return sqlGetQueryInternal(db, query, resourceType)
+	return GetQueryInternal(db, query, resourceType)
 }
 
-func sqlGetRecordsByResourceTypeAndSubjectInternal(db *sql.DB, resourceType string, subject string) ([]gjson.Result, error) {
+func GetRecordsByResourceTypeAndSubjectInternal(db *sql.DB, resourceType string, subject string) ([]gjson.Result, error) {
 	query := fmt.Sprintf(`
         SELECT metadata
         FROM %s
         WHERE resourceType = ? and subject = ?;
     `, constants.FHIRDataTableName)
 
-	return sqlGetQueryInternal(db, query, resourceType, subject)
+	return GetQueryInternal(db, query, resourceType, subject)
 }
 
-func sqlGetRecordsBySubjectInternal(db *sql.DB, subject string) ([]gjson.Result, error) {
+func GetRecordsBySubjectInternal(db *sql.DB, subject string) ([]gjson.Result, error) {
 	query := fmt.Sprintf(`
         SELECT metadata
         FROM %s
         WHERE subject = ?;
     `, constants.FHIRDataTableName)
 
-	return sqlGetQueryInternal(db, query, subject)
+	return GetQueryInternal(db, query, subject)
 }
 
-func sqlGetQueryInternal(db *sql.DB, query string, args ...interface{}) ([]gjson.Result, error) {
+func GetQueryInternal(db *sql.DB, query string, args ...interface{}) ([]gjson.Result, error) {
 	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query records: %w", err)
@@ -215,4 +231,156 @@ func sqlGetQueryInternal(db *sql.DB, query string, args ...interface{}) ([]gjson
 	}
 
 	return results, nil
+}
+
+func GetRecordCountForResourceType(resourceType string) (int, error) {
+	db, err := Connect(constants.SqlDBName)
+
+	if err != nil {
+		return 0, err
+	}
+	defer db.Close()
+
+	return getRecordCountForResourceTypeInternal(db, resourceType)
+}
+
+func getRecordCountForResourceTypeInternal(db *sql.DB, resourceType string) (int, error) {
+	var count int
+
+	query := fmt.Sprintf(`
+        SELECT COUNT(*) 
+		FROM %s 
+		WHERE resourceType = ?;
+    `, constants.FHIRDataTableName)
+
+	err := db.QueryRow(query, resourceType).Scan(&count)
+
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func GetRecordCountForSubject() (int, error) {
+	db, err := Connect(constants.SqlDBName)
+
+	if err != nil {
+		return 0, err
+	}
+	defer db.Close()
+
+	return getRecordCountForSubjectInternal(db)
+}
+
+func getRecordCountForSubjectInternal(db *sql.DB) (int, error) {
+	var count int
+
+	query := fmt.Sprintf(`
+        SELECT COUNT(DISTINCT subject) AS unique_count 
+		FROM %s;
+    `, constants.FHIRDataTableName)
+
+	err := db.QueryRow(query).Scan(&count)
+
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func GetRecordCountPerPatient() (map[string]int, error) {
+	db, err := Connect(constants.SqlDBName)
+
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	return getRecordCountPerPatientInternal(db)
+}
+
+func getRecordCountPerPatientInternal(db *sql.DB) (map[string]int, error) {
+
+	query := fmt.Sprintf(`
+        SELECT subject, COUNT(*) AS record_count
+		FROM %s
+		GROUP BY subject;
+    `, constants.FHIRDataTableName)
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := make(map[string]int)
+
+	// Ensure any errors from iteration are caught
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var subject string
+		var count int
+		if err := rows.Scan(&subject, &count); err != nil {
+			return nil, err
+		}
+		results[subject] = count
+	}
+
+	return results, nil
+}
+
+func InsertValidationError(entryID string, validationError string) error {
+	db, err := Connect(constants.SqlDBName)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return insertValidationErrorInternal(db, entryID, validationError)
+}
+
+func insertValidationErrorInternal(db *sql.DB, entryID string, validationError string) error {
+	query := fmt.Sprintf(`
+        INSERT INTO %s (entryId, validationError) 
+		VALUES (?, ?)
+    `, constants.ValidationErrorTableName)
+	_, err := db.Exec(query, entryID, validationError)
+	return err
+}
+
+func GetAllValidationErrors() ([]objects.ValidationError, error) {
+	db, err := Connect(constants.SqlDBName)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	return getAllValidationErrorsInternal(db)
+}
+
+func getAllValidationErrorsInternal(db *sql.DB) ([]objects.ValidationError, error) {
+	query := fmt.Sprintf(`
+        SELECT entryId, validationError
+        FROM %s
+    `, constants.ValidationErrorTableName)
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []objects.ValidationError
+	for rows.Next() {
+		var ve objects.ValidationError
+		if err := rows.Scan(&ve.EntryID, &ve.ValidationError); err != nil {
+			return nil, err
+		}
+		results = append(results, ve)
+	}
+
+	return results, rows.Err()
 }

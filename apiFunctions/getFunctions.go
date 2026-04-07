@@ -3,7 +3,7 @@ package apiFunctions
 import "github.com/gabrielcortez835-lab/Novellia-take-home-assessment/sql"
 
 func GetRecords(resourceTypeFilter string, subjectFilter string, fields []string) (string, error) {
-	sqlResults, err := sql.SqlGetRecords(resourceTypeFilter, subjectFilter)
+	sqlResults, err := sql.GetRecords(resourceTypeFilter, subjectFilter)
 
 	if err != nil {
 		return "", err
@@ -14,7 +14,7 @@ func GetRecords(resourceTypeFilter string, subjectFilter string, fields []string
 
 func GetRecordsById(id string, fields []string) (string, error) {
 
-	sqlResults, err := sql.SqlGetRecordsById(id)
+	sqlResults, err := sql.GetRecordsById(id)
 
 	if err != nil {
 		return "", err

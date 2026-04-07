@@ -38,6 +38,7 @@ func setupAPIS() *gin.Engine {
 	r.GET(constants.ApiGetRecordsByIdPath, apiGetRecordsById)
 	r.GET(constants.ApiGetRecordsPath, apiGetRecords)
 	r.POST(constants.ApiPostTransformPath, apiPostTransform)
+	r.GET(constants.ApiGetAnalytics, apiGetAnalytics)
 
 	return r
 }
@@ -48,13 +49,13 @@ func apiPostImport(c *gin.Context) {
 	defer c.Request.Body.Close()
 
 	importReturn := ImportReturn{
-		totalLinesProcessed:         0,
-		recordsImportedSuccessfully: 0,
-		validationErrors:            make([]string, 0),
-		dataQualityWarnings:         make(map[string][]string),
-		statistics: Statistics{
+		TotalLinesProcessed:         0,
+		RecordsImportedSuccessfully: 0,
+		ValidationErrors:            make([]string, 0),
+		DataQualityWarnings:         make(map[string][]string),
+		Statistics: Statistics{
 			RecordsByType:  make(map[string]int),
-			uniquePatients: 0,
+			UniquePatients: 0,
 		},
 	}
 	cfg, err := extractionConfig.GetExtractionConfig(constants.ExtractionConfigFileName)
@@ -91,18 +92,31 @@ func apiPostImport(c *gin.Context) {
 			dataQualityWarnings, err := apiFunctions.ProcessImportedJson(objLine, cfg)
 
 			if err != nil {
-				importReturn.validationErrors = append(importReturn.validationErrors, fmt.Sprintf("Error Processing on line %d object %d: %v", lineNum, objNum+1, err))
+				importReturn.ValidationErrors = append(importReturn.ValidationErrors, fmt.Sprintf("Error Processing on line %d object %d: %v", lineNum, objNum+1, err))
 				continue
 			}
 
-			importReturn.totalLinesProcessed++
+			importReturn.TotalLinesProcessed++
 
 			if len(dataQualityWarnings) > 0 {
-				importReturn.dataQualityWarnings[""] = dataQualityWarnings
+				importReturn.DataQualityWarnings[""] = dataQualityWarnings
+			} else {
+				importReturn.RecordsImportedSuccessfully++
 			}
-
 		}
 	}
+
+	analytics, err := apiFunctions.ApiGetAnalyticsObject()
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Encountered an issue, please try again later",
+		})
+		return
+	}
+
+	importReturn.Statistics.RecordsByType = analytics.RecordsByResourceType
+	importReturn.Statistics.UniquePatients = analytics.NumberOfUniqueSubjects
 
 	if err := scanner.Err(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -110,8 +124,9 @@ func apiPostImport(c *gin.Context) {
 		})
 		return
 	}
+	jsonBytes, err := json.Marshal(importReturn)
 
-	c.JSON(http.StatusOK, gin.H{"status": "Import complete"})
+	c.JSON(http.StatusOK, gin.H{"result": string(jsonBytes)})
 }
 
 func apiGetRecordsById(c *gin.Context) {
@@ -164,6 +179,7 @@ func apiGetRecords(c *gin.Context) {
 	metadata, err := apiFunctions.GetRecords(resourceType, subject, fieldsArr)
 
 	if err != nil {
+		fmt.Print(err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Encountered an issue, please try again later",
 		})
@@ -213,5 +229,21 @@ func apiPostTransform(c *gin.Context) {
 }
 
 func apiGetAnalytics(c *gin.Context) {
+	metadata, err := apiFunctions.ApiGetAnalytics()
 
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Encountered an issue, please try again later",
+		})
+		return
+	}
+
+	if metadata == "" {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "No Entry Found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"result": metadata})
 }
