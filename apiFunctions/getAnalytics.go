@@ -5,15 +5,9 @@ import (
 	"log"
 
 	"github.com/gabrielcortez835-lab/Novellia-take-home-assessment/constants"
+	"github.com/gabrielcortez835-lab/Novellia-take-home-assessment/objects"
 	"github.com/gabrielcortez835-lab/Novellia-take-home-assessment/sql"
 )
-
-type Analytics struct {
-	RecordsByResourceType  map[string]int `json:"recordsByResourceType"`
-	NumberOfUniqueSubjects int            `json:"numberOfUniqueSubjects"`
-	ValidationErrorSummary []string       `json:"validationErrorSummary"`
-	TotalEntriesPerPatient map[string]int `json:"totalEntriesPerPatient"`
-}
 
 func ApiGetAnalytics() (string, error) {
 
@@ -34,11 +28,11 @@ func ApiGetAnalytics() (string, error) {
 	return returnString, nil
 }
 
-func ApiGetAnalyticsObject() (Analytics, error) {
-	a := Analytics{
+func ApiGetAnalyticsObject() (objects.Analytics, error) {
+	a := objects.Analytics{
 		RecordsByResourceType:  make(map[string]int),
-		NumberOfUniqueSubjects: 0,          // default, optional
-		ValidationErrorSummary: []string{}, // empty slice
+		NumberOfUniqueSubjects: 0,                                  // default, optional
+		ValidationErrorSummary: make([]objects.ValidationError, 0), // empty slice
 		TotalEntriesPerPatient: make(map[string]int),
 	}
 
@@ -66,7 +60,7 @@ func ApiGetAnalyticsObject() (Analytics, error) {
 		return a, err
 	}
 
-	a.ValidationErrorSummary, err = StructSliceToJSONStringSlice(validationErrors)
+	a.ValidationErrorSummary = validationErrors
 
 	if err != nil {
 		return a, err

@@ -2,6 +2,7 @@ package sql
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -357,7 +358,6 @@ func GetAllValidationErrors() ([]objects.ValidationError, error) {
 		return nil, err
 	}
 	defer db.Close()
-
 	return getAllValidationErrorsInternal(db)
 }
 
@@ -375,12 +375,22 @@ func getAllValidationErrorsInternal(db *sql.DB) ([]objects.ValidationError, erro
 
 	var results []objects.ValidationError
 	for rows.Next() {
-		var ve objects.ValidationError
-		if err := rows.Scan(&ve.EntryID, &ve.ValidationError); err != nil {
+		var entryID string
+		var rawValErr string
+
+		if err := rows.Scan(&entryID, &rawValErr); err != nil {
 			return nil, err
 		}
-		results = append(results, ve)
-	}
 
+		var valErrList []string
+		if err := json.Unmarshal([]byte(rawValErr), &valErrList); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal ValidationError JSON for entry %s: %w", entryID, err)
+		}
+
+		results = append(results, objects.ValidationError{
+			EntryID:         entryID,
+			ValidationError: valErrList,
+		})
+	}
 	return results, rows.Err()
 }

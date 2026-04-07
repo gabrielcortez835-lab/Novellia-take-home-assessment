@@ -52,7 +52,7 @@ func apiPostImport(c *gin.Context) {
 		TotalLinesProcessed:         0,
 		RecordsImportedSuccessfully: 0,
 		ValidationErrors:            make([]string, 0),
-		DataQualityWarnings:         make(map[string][]string),
+		DataQualityWarnings:         make([][]string, 0),
 		Statistics: Statistics{
 			RecordsByType:  make(map[string]int),
 			UniquePatients: 0,
@@ -99,7 +99,7 @@ func apiPostImport(c *gin.Context) {
 			importReturn.TotalLinesProcessed++
 
 			if len(dataQualityWarnings) > 0 {
-				importReturn.DataQualityWarnings[""] = dataQualityWarnings
+				importReturn.DataQualityWarnings = append(importReturn.DataQualityWarnings, dataQualityWarnings)
 			} else {
 				importReturn.RecordsImportedSuccessfully++
 			}

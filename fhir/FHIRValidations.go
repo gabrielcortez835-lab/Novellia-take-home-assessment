@@ -105,6 +105,10 @@ func validateFHIRBaseGJSON(resource gjson.Result) []string {
 
 func validateStatusGJSON(status gjson.Result) string {
 	statusStr := strings.TrimSpace(status.String())
+
+	if statusStr == "" {
+		return "status Field Missing"
+	}
 	if !constants.ValidStatus[statusStr] {
 		return fmt.Sprintf("Invalid Status: %s", statusStr)
 	}
