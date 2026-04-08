@@ -62,10 +62,6 @@ func ApiGetAnalyticsObject() (objects.Analytics, error) {
 
 	a.ValidationErrorSummary = validationErrors
 
-	if err != nil {
-		return a, err
-	}
-
 	subjectCountMap, err := sql.GetRecordCountPerPatient()
 
 	if err != nil {
