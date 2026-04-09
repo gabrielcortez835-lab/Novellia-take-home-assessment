@@ -1,10 +1,10 @@
 # Gabriel Novellia Assignment
 
 ## How to build
-`docker build -t app`
+`docker build -t app .`
 
 ## How to run
-`docker run app`
+`docker run -p 8080:8080 app`
 
 ## Endpoints
 

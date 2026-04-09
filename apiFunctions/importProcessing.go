@@ -27,7 +27,7 @@ func ProcessImportedJson(jsonString string, cfg extractionConfig.ExtractionConfi
 
 	patientID := ""
 	if resourceType == constants.ResourceTypeEnum.Patient {
-		patientID = id
+		patientID = "Patient/" + id
 	} else {
 		subj := resource.Get("subject.reference")
 		if subj.Exists() {
